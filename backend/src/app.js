@@ -15,6 +15,7 @@ app.get('/health', (req, res) => {
 // Routes will be mounted here as we build them:
 app.use('/api/auth', require('./routes/auth.routes'));
 app.use('/api/rides', require('./routes/ride.routes'));
+app.use('/api/driver', require('./routes/driver.routes'));
 
 // Centralized error handler (must be last)
 app.use((err, req, res, next) => {
