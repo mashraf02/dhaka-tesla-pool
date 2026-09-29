@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "jest",
     "dev": "tsx watch src/server.js",
     "start": "tsx src/server.js",
     "seed": "tsx prisma/seed.js"
@@ -26,6 +26,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "jest": "^30.5.2",
     "prisma": "^7.10.0",
     "tsx": "^4.23.15"
   }
