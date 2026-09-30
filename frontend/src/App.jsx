@@ -5,6 +5,7 @@ import ProtectedRoute from './routes/ProtectedRoute';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import PassengerDashboard from './pages/PassengerDashboard';
+import DriverDashboard from './pages/DriverDashboard';
 
 function Home() {
   const { user } = useAuth();
@@ -12,10 +13,6 @@ function Home() {
   return <Navigate to={user.role === 'DRIVER' ? '/driver' : '/passenger'} replace />;
 }
 
-// Placeholder dashboards — replaced in Part 3 (passenger) and Part 4 (driver).
-function DriverDashboardPlaceholder() {
-  return <h1>Driver dashboard coming in Part 4</h1>;
-}
 
 export default function App() {
   return (
@@ -37,7 +34,7 @@ export default function App() {
             path="/driver"
             element={
               <ProtectedRoute role="DRIVER">
-                <DriverDashboardPlaceholder />
+                <DriverDashboard />
               </ProtectedRoute>
             }
           />
