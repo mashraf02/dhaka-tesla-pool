@@ -24,7 +24,7 @@ services:
     restart: unless-stopped
     env_file: .env
     environment:
-      DATABASE_URL: ${DATABASE_URL}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
     ports:
       - "${PORT}:4000"
     depends_on:
@@ -33,12 +33,15 @@ services:
     volumes:
       - ./backend:/app
       - /app/node_modules
+    command: sh -c "npx prisma migrate deploy && npx prisma db seed && npm run dev"
 
   frontend:
     build: ./frontend
     container_name: tesla_pool_frontend
     restart: unless-stopped
     env_file: .env
+    environment:
+      VITE_API_URL: http://localhost:${PORT}
     ports:
       - "5173:5173"
     depends_on:
