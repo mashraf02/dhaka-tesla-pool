@@ -38,3 +38,42 @@ every ride's full history is kept for later review.
   trip (see [Fare model](#fare-model) below)
 - **Full audit trail**: every ride status change is recorded as its own event, not
   just overwritten
+
+## Tech stack
+
+| Layer | Choice | Why |
+|---|---|---|
+| Frontend | React (Vite) | Fast dev server (native ES modules, no bundler in dev), simpler than Next.js for a client-only SPA with no SSR/routing-on-the-server need |
+| Backend | Node.js + Express | Lightweight for an MVP this size; every route is easy to trace and defend line by line, versus NestJS's heavier DI/module ceremony |
+| Database | PostgreSQL 16 | Relational data (users, vehicles, pools, rides all foreign-keyed together), transactions + row locking (`SELECT ... FOR UPDATE`) needed for the seat-concurrency problem, native enums for status/area |
+| ORM | Prisma 7 (with `@prisma/adapter-pg`) | Single schema file generates both migrations and a type-safe client; adapter lets Prisma run over the standard `pg` driver |
+| Auth | JWT + bcrypt | Stateless (no session store needed for an MVP), bcrypt for one-way password hashing |
+| Validation | Zod | Schema-based request validation as middleware, before any business logic runs |
+| Testing | Jest + Supertest | Jest for unit + integration, Supertest for hitting the Express app directly without binding a real port |
+| Containerization | Docker Compose | One `docker compose up` builds and runs Postgres, the API, and the frontend together, with migrations and seed data applied automatically |
+
+**Alternatives considered:** MySQL/SQLite for the database (Postgres won on
+row-locking and native enum support), NestJS for the backend (more structure than
+an MVP of this size needs), Redux for frontend state (React Context was enough
+for the small amount of shared auth state). None of these were built only to look
+impressive — the PRD explicitly warns against that, and every choice above is one
+we'd actually defend in the interview.
+
+## Architecture
+Browser (Passenger / Driver)
+│
+▼
+React (Vite) SPA ──REST + JSON, Bearer JWT──▶ Node.js + Express API
+routes → controllers → services
+│
+▼
+PostgreSQL 16 (via Prisma)
+
+
+Inside the API:
+- **routes/** — URL + HTTP verb mapping only
+- **controllers/** — parse the request, call a service, shape the HTTP response
+- **services/** — business rules (matching, fare, state transitions, seat capacity) — framework-agnostic, unit-testable without Express or Prisma running
+- **middleware/** — auth (JWT verification + role guard), request validation, central error handler
+
+*A full architecture diagram and ERD (drawn in draw.io) are in [`docs/architecture.png`](docs/architecture.png) and [`docs/erd.png`](docs/erd.png).*
