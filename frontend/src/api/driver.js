@@ -19,3 +19,11 @@ export function getPool(poolId) {
 export function advancePool(poolId, stage) {
   return client.post(`/api/driver/pools/${poolId}/${stage}`);
 }
+
+export function listVehicles() {
+  return client.get('/api/driver/vehicles');
+}
+
+export function createVehicle(data) {
+  return client.post('/api/driver/vehicles', data);
+}
