@@ -60,6 +60,7 @@ impressive — the PRD explicitly warns against that, and every choice above is 
 we'd actually defend in the interview.
 
 ## Architecture
+```
 Browser (Passenger / Driver)
 │
 ▼
@@ -69,6 +70,8 @@ routes → controllers → services
 ▼
 PostgreSQL 16 (via Prisma)
 
+
+```
 
 Inside the API:
 - **routes/** — URL + HTTP verb mapping only
