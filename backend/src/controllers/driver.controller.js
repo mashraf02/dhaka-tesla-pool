@@ -53,3 +53,24 @@ async function getPool(req, res, next) {
 }
 
 module.exports = { setOnline, listRequests, accept, advanceTo, getPool };
+
+async function listVehicles(req, res, next) {
+  try {
+    const vehicles = await driverService.listOwnVehicles(req.user.id);
+    res.status(200).json({ vehicles });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function createVehicle(req, res, next) {
+  try {
+    const vehicle = await driverService.createVehicle(req.user.id, req.body);
+    res.status(201).json({ vehicle });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports.listVehicles = listVehicles;
+module.exports.createVehicle = createVehicle;
