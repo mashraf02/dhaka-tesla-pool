@@ -33,6 +33,7 @@ services:
     volumes:
       - ./backend:/app
       - /app/node_modules
+      - /app/src/generated
     command: sh -c "npx prisma migrate deploy && npx prisma db seed && npm run dev"
 
   frontend:
@@ -49,6 +50,7 @@ services:
     volumes:
       - ./frontend:/app
       - /app/node_modules
+      - /app/src/generated
 
 volumes:
   pgdata:
