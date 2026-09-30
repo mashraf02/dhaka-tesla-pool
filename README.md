@@ -206,3 +206,83 @@ npm test -- --coverage      # with a coverage report
 ```
 
 Integration tests need a reachable Postgres instance. Set `DATABASE_URL` in `.env` to a test database before running them.
+
+## API reference
+
+Base URL: `http://localhost:4000/api`. All request and response bodies are JSON.
+
+### Authentication
+
+Protected routes need a JWT in the `Authorization` header:
+
+```
+Authorization: Bearer <token>
+```
+
+Get a token from `POST /auth/login`. Routes marked **Driver** or **Passenger** return `403` for the other role.
+
+### Endpoints
+
+| Method | Path | Access | Description |
+|---|---|---|---|
+| POST | `/auth/register` | Public | Create a driver or passenger account |
+| POST | `/auth/login` | Public | Exchange credentials for a JWT |
+| GET | `/auth/me` | Any user | Current user profile |
+| POST | `/pools` | Driver | Open a new pool (area, departure time, seats) |
+| GET | `/pools` | Any user | List pools; filter with `?area=` and `?status=` |
+| GET | `/pools/:id` | Any user | Pool details, seats left, current fare share |
+| POST | `/pools/:id/join` | Passenger | Take a seat (capacity-checked in a transaction) |
+| POST | `/pools/:id/leave` | Passenger | Give up a seat before departure |
+| PATCH | `/pools/:id/status` | Driver | Move the pool through its allowed states |
+| GET | `/rides/me` | Any user | Ride history for the logged-in user |
+
+### Example: register and log in
+
+```bash
+curl -X POST http://localhost:4000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"passenger1@example.com","password":"Password123!"}'
+```
+
+```json
+{
+  "token": "<jwt>",
+  "user": { "id": 2, "name": "Passenger One", "role": "PASSENGER" }
+}
+```
+
+### Example: join a pool
+
+```bash
+curl -X POST http://localhost:4000/api/pools/1/join \
+  -H "Authorization: Bearer <token>"
+```
+
+```json
+{
+  "poolId": 1,
+  "seatsRemaining": 2,
+  "farePerPassenger": 60
+}
+```
+
+### Errors
+
+Errors share one shape, produced by the central error handler:
+
+```json
+{ "error": "Pool is full" }
+```
+
+| Status | Meaning |
+|---|---|
+| 400 | Validation failed (Zod) or invalid state transition |
+| 401 | Missing, invalid, or expired token |
+| 403 | Authenticated, but wrong role for this route |
+| 404 | Resource not found |
+| 409 | Conflict, e.g. no seats left or already joined |
+| 500 | Unexpected server error |
+
+### Concurrency note
+
+`POST /pools/:id/join` reads and updates seat count inside a transaction using `SELECT ... FOR UPDATE`. If two passengers try to take the last seat at the same moment, one succeeds and the other gets `409`.
