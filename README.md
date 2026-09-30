@@ -149,7 +149,7 @@ cp .env.example .env
 The fastest way to run everything. Docker Compose starts Postgres, applies migrations, seeds demo data, and launches the API and frontend.
 
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/mashraf02/dhaka-tesla-pool.git
 cd dhaka-tesla-pool
 cp .env.example .env
 docker compose up --build
@@ -322,4 +322,4 @@ Errors share one shape, produced by the central error handler:
 
 ## Author
 
-Built by Mashraful for the RoBenDevs internship challenge.
+Built by [Mashraful](https://github.com/mashraf02) for the RoBenDevs internship challenge.
