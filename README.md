@@ -80,3 +80,66 @@ Inside the API:
 - **middleware/** — auth (JWT verification + role guard), request validation, central error handler
 
 *A full architecture diagram and ERD (drawn in draw.io) are in [`docs/architecture.png`](docs/architecture.png) and [`docs/erd.png`](docs/erd.png).*
+
+## Project structure
+
+```
+dhaka-tesla-pool/
+├── backend/
+│   ├── prisma/
+│   │   ├── schema.prisma        # Single source of truth for the data model
+│   │   ├── migrations/          # Generated SQL migrations
+│   │   └── seed.js              # Demo users, vehicle, and rides
+│   ├── src/
+│   │   ├── routes/              # URL + HTTP verb mapping only
+│   │   ├── controllers/         # Request parsing, response shaping
+│   │   ├── services/            # Business rules (matching, fare, seats, state)
+│   │   ├── middleware/          # auth, role guard, Zod validation, error handler
+│   │   ├── app.js               # Express app (exported for Supertest)
+│   │   └── server.js            # Binds the port
+│   ├── tests/                   # Jest unit + Supertest integration tests
+│   └── Dockerfile
+├── frontend/
+│   ├── src/
+│   │   ├── components/
+│   │   ├── pages/
+│   │   ├── context/             # Auth context (JWT + current user)
+│   │   └── api/                 # Fetch wrapper that attaches the Bearer token
+│   └── Dockerfile
+├── docs/
+│   ├── architecture.png
+│   └── erd.png
+├── docker-compose.yml
+├── .env.example
+└── README.md
+```
+
+## Prerequisites
+
+| Tool | Version | Needed for |
+|---|---|---|
+| Docker + Docker Compose | Docker 24+ | Recommended path: runs everything with one command |
+| Node.js | 20 LTS or newer | Only for running without Docker, or running tests locally |
+| PostgreSQL | 16 | Only for running without Docker |
+| Git | any recent | Cloning the repo |
+
+## Environment variables
+
+Copy `.env.example` to `.env` before running anything:
+
+```bash
+cp .env.example .env
+```
+
+| Variable | Example | Purpose |
+|---|---|---|
+| `POSTGRES_USER` | `tesla` | Database user (used by Docker Compose) |
+| `POSTGRES_PASSWORD` | `change_me` | Database password |
+| `POSTGRES_DB` | `tesla_pool` | Database name |
+| `DATABASE_URL` | `postgresql://tesla:change_me@db:5432/tesla_pool` | Connection string used by Prisma (use `localhost` instead of `db` outside Docker) |
+| `JWT_SECRET` | *(long random string)* | Signs auth tokens. Never commit a real value |
+| `JWT_EXPIRES_IN` | `1d` | Token lifetime |
+| `PORT` | `4000` | API port |
+| `VITE_API_URL` | `http://localhost:4000` | Where the frontend sends API requests |
+
+> `.env` is git-ignored. Only `.env.example` (placeholder values) is committed.
