@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import ProtectedRoute from './routes/ProtectedRoute';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import PassengerDashboard from './pages/PassengerDashboard';
 
 function Home() {
   const { user } = useAuth();
@@ -12,9 +13,6 @@ function Home() {
 }
 
 // Placeholder dashboards — replaced in Part 3 (passenger) and Part 4 (driver).
-function PassengerDashboardPlaceholder() {
-  return <h1>Passenger dashboard coming in Part 3</h1>;
-}
 function DriverDashboardPlaceholder() {
   return <h1>Driver dashboard coming in Part 4</h1>;
 }
@@ -31,7 +29,7 @@ export default function App() {
             path="/passenger"
             element={
               <ProtectedRoute role="PASSENGER">
-                <PassengerDashboardPlaceholder />
+                <PassengerDashboard />
               </ProtectedRoute>
             }
           />
