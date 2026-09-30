@@ -317,3 +317,10 @@ Errors are produced by a central error handler. Services throw errors carrying a
 ## Author
 
 Built by [Mashraful](https://github.com/mashraf02) for the RoBenDevs internship challenge.
+
+**What would make me switch:**
+- *Express → NestJS*: if the team and codebase grew enough to need enforced module boundaries.
+- *Prisma → SQL/query builder*: if geospatial or heavily tuned queries outgrew what the ORM expresses well.
+- *JWT → server-side sessions or short-lived tokens with refresh*: if I needed instant revocation.
+- *React Context → Redux/React Query*: if shared client state or server-cache handling grew beyond auth.
+- *Postgres → Postgres + PostGIS*: once matching needs real distance queries.
