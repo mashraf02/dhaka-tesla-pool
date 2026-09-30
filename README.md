@@ -143,3 +143,66 @@ cp .env.example .env
 | `VITE_API_URL` | `http://localhost:4000` | Where the frontend sends API requests |
 
 > `.env` is git-ignored. Only `.env.example` (placeholder values) is committed.
+
+## Quick start (Docker)
+
+The fastest way to run everything. Docker Compose starts Postgres, applies migrations, seeds demo data, and launches the API and frontend.
+
+```bash
+git clone <your-repo-url>
+cd dhaka-tesla-pool
+cp .env.example .env
+docker compose up --build
+```
+
+Once the containers are up:
+
+| Service | URL |
+|---|---|
+| Frontend | http://localhost:5173 |
+| API | http://localhost:4000 |
+| Health check | http://localhost:4000/health |
+
+To stop everything: `docker compose down`. To also wipe the database volume and start fresh: `docker compose down -v`.
+
+## Local development (without Docker)
+
+You'll need Node.js 20+ and a running PostgreSQL 16 instance.
+
+**1. Backend**
+
+```bash
+cd backend
+npm install
+# In .env, point DATABASE_URL at localhost instead of the "db" host
+npx prisma migrate dev      # applies migrations, generates the Prisma client
+npx prisma db seed          # loads demo users, vehicle, and rides
+npm run dev                 # API on http://localhost:4000
+```
+
+**2. Frontend** (in a second terminal)
+
+```bash
+cd frontend
+npm install
+npm run dev                 # SPA on http://localhost:5173
+```
+
+## Demo accounts
+
+The seed script creates these accounts so you can try both roles right away:
+
+| Role | Email | Password |
+|---|---|---|
+| Driver | `driver@example.com` | `Password123!` |
+| Passenger | `passenger1@example.com` | `Password123!` |
+
+## Running tests
+
+```bash
+cd backend
+npm test                    # unit + integration (Jest + Supertest)
+npm test -- --coverage      # with a coverage report
+```
+
+Integration tests need a reachable Postgres instance. Set `DATABASE_URL` in `.env` to a test database before running them.
