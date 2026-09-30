@@ -102,3 +102,14 @@ async function advancePool(poolId, driverId, toStatus) {
 }
 
 module.exports = { setOnline, listUnmatchedRequests, acceptRide, advancePool, getOwnedPoolOrThrow, getOwnedVehicleOrThrow };
+
+async function listOwnVehicles(driverId) {
+  return prisma.vehicle.findMany({ where: { driverId }, orderBy: { createdAt: 'asc' } });
+}
+
+async function createVehicle(driverId, { label, capacity }) {
+  return prisma.vehicle.create({ data: { label, capacity, driverId, isOnline: false } });
+}
+
+module.exports.listOwnVehicles = listOwnVehicles;
+module.exports.createVehicle = createVehicle;
