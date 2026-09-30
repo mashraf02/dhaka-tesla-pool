@@ -79,7 +79,9 @@ Inside the API:
 - **services/** — business rules (matching, fare, state transitions, seat capacity) — framework-agnostic, unit-testable without Express or Prisma running
 - **middleware/** — auth (JWT verification + role guard), request validation, central error handler
 
-*A full architecture diagram and ERD (drawn in draw.io) are in [`docs/architecture.png`](docs/architecture.png) and [`docs/erd.png`](docs/erd.png).*
+![Architecture](docs/architecture.png)
+
+![ERD](docs/erd.png)
 
 ## Project structure
 
