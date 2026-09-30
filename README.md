@@ -135,10 +135,10 @@ cp .env.example .env
 
 | Variable | Example | Purpose |
 |---|---|---|
-| `POSTGRES_USER` | `tesla` | Database user (used by Docker Compose) |
+| `POSTGRES_USER` | `tesla_admin` | Database user (used by Docker Compose) |
 | `POSTGRES_PASSWORD` | `change_me` | Database password |
-| `POSTGRES_DB` | `tesla_pool` | Database name |
-| `DATABASE_URL` | `postgresql://tesla:change_me@db:5432/tesla_pool` | Connection string used by Prisma (use `localhost` instead of `db` outside Docker) |
+| `POSTGRES_DB` | `dhaka_tesla_pool` | Database name |
+| `DATABASE_URL` | `postgresql://tesla_admin:change_me@db:5432/dhaka_tesla_pool` | Connection string used by Prisma (use `localhost` instead of `db` outside Docker) |
 | `JWT_SECRET` | *(long random string)* | Signs auth tokens. Never commit a real value |
 | `JWT_EXPIRES_IN` | `1d` | Token lifetime |
 | `PORT` | `4000` | API port |
@@ -163,7 +163,6 @@ Once the containers are up:
 |---|---|
 | Frontend | http://localhost:5173 |
 | API | http://localhost:4000 |
-| Health check | http://localhost:4000/health |
 
 To stop everything: `docker compose down`. To also wipe the database volume and start fresh: `docker compose down -v`.
 
@@ -189,15 +188,6 @@ cd frontend
 npm install
 npm run dev                 # SPA on http://localhost:5173
 ```
-
-## Demo accounts
-
-The seed script creates these accounts so you can try both roles right away:
-
-| Role | Email | Password |
-|---|---|---|
-| Driver | `driver@example.com` | `Password123!` |
-| Passenger | `passenger1@example.com` | `Password123!` |
 
 ## Running tests
 
