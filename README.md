@@ -199,13 +199,38 @@ The seed script creates these accounts so you can try both roles right away:
 
 ## Running tests
 
+Integration tests need the database running and migrated:
+
 ```bash
+docker compose up -d db
 cd backend
-npm test                    # unit + integration (Jest + Supertest)
+npx prisma migrate deploy
+npm test                    # 8 suites, 45 tests
 npm test -- --coverage      # with a coverage report
 ```
 
-Integration tests need a reachable Postgres instance. Set `DATABASE_URL` in `.env` to a test database before running them.
+Unit tests cover `utils/` (fare, matching, state machine). Integration tests cover auth, vehicles, the ride lifecycle, an end-to-end story, and the seat-concurrency race. Statement coverage is about 79% in `services/` and 100% in `utils/`, `routes/` and `schemas/`.
+
+## Fare model
+
+All money is stored as **integer poysha** (100 poysha = 1 taka), so there are no floating-point rounding errors.
+
+| Constant | Value |
+|---|---|
+| Base fare | 4,000 poysha (40 taka) |
+| Per km | 1,500 poysha (15 taka) |
+| Pool discount | 20%, only when 2+ passengers share the ride |
+
+```
+solo fare      = (base + distanceKm(pickup, destination) × per_km) × seats
+pooled fare    = solo fare − floor(solo fare × 20 / 100)
+```
+
+Example for a 5 km trip, one seat: solo = 4,000 + 5 × 1,500 = 11,500 poysha (115 taka). Shared with another passenger, the discount is 2,300, so each pays 9,200 poysha (92 taka).
+
+- When a request is created, the estimate is the **solo** fare.
+- Whenever a passenger joins a pool, every active member's estimate is recalculated inside the same database transaction.
+- When a ride reaches `COMPLETED`, the estimate is frozen into `finalFarePoysha`.
 
 ## API reference
 
@@ -213,112 +238,89 @@ Base URL: `http://localhost:4000/api`. All request and response bodies are JSON.
 
 ### Authentication
 
-Protected routes need a JWT in the `Authorization` header:
+Protected routes need a JWT:
 
 ```
 Authorization: Bearer <token>
 ```
 
-Get a token from `POST /auth/login`. Routes marked **Driver** or **Passenger** return `403` for the other role.
+Get a token from `POST /auth/login`. Routes are role-guarded (`PASSENGER` or `DRIVER`).
 
 ### Endpoints
 
-| Method | Path | Access | Description |
+| Method | Path | Role | Description |
 |---|---|---|---|
-| POST | `/auth/register` | Public | Create a driver or passenger account |
+| POST | `/auth/register` | Public | Create a passenger or driver account |
 | POST | `/auth/login` | Public | Exchange credentials for a JWT |
-| GET | `/auth/me` | Any user | Current user profile |
-| POST | `/pools` | Driver | Open a new pool (area, departure time, seats) |
-| GET | `/pools` | Any user | List pools; filter with `?area=` and `?status=` |
-| GET | `/pools/:id` | Any user | Pool details, seats left, current fare share |
-| POST | `/pools/:id/join` | Passenger | Take a seat (capacity-checked in a transaction) |
-| POST | `/pools/:id/leave` | Passenger | Give up a seat before departure |
-| PATCH | `/pools/:id/status` | Driver | Move the pool through its allowed states |
-| GET | `/rides/me` | Any user | Ride history for the logged-in user |
+| POST | `/rides` | Passenger | Request a ride (pickup area, destination area, seats) |
+| GET | `/rides/mine` | Passenger | The passenger's ride history |
+| POST | `/rides/:id/cancel` | Passenger | Cancel a ride that is still cancellable |
+| GET | `/driver/vehicles` | Driver | List the driver's vehicles |
+| POST | `/driver/vehicles` | Driver | Register a vehicle |
+| PATCH | `/driver/vehicles/:vehicleId/online` | Driver | Set a vehicle online or offline |
+| GET | `/driver/requests` | Driver | Open ride requests the driver can take |
+| POST | `/driver/vehicles/:vehicleId/accept` | Driver | Accept a request; it joins a pool with seat capacity checked |
+| GET | `/driver/pools/:poolId` | Driver | Pool details and its members |
+| POST | `/driver/pools/:poolId/arrived` | Driver | Move the pool to `DRIVER_ARRIVED` |
+| POST | `/driver/pools/:poolId/start` | Driver | Move the pool to `STARTED` |
+| POST | `/driver/pools/:poolId/complete` | Driver | Move the pool to `COMPLETED` and freeze final fares |
 
-### Example: register and log in
+### Example: request a ride
 
 ```bash
-curl -X POST http://localhost:4000/api/auth/login \
+curl -X POST http://localhost:4000/api/rides \
+  -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
-  -d '{"email":"passenger1@example.com","password":"Password123!"}'
-```
-
-```json
-{
-  "token": "<jwt>",
-  "user": { "id": 2, "name": "Passenger One", "role": "PASSENGER" }
-}
-```
-
-### Example: join a pool
-
-```bash
-curl -X POST http://localhost:4000/api/pools/1/join \
-  -H "Authorization: Bearer <token>"
-```
-
-```json
-{
-  "poolId": 1,
-  "seatsRemaining": 2,
-  "farePerPassenger": 60
-}
+  -d '{"pickupArea":"BANANI","destinationArea":"DHANMONDI","seatsRequested":1}'
 ```
 
 ### Errors
 
-Errors share one shape, produced by the central error handler:
-
-```json
-{ "error": "Pool is full" }
-```
+Errors are produced by a central error handler. Services throw errors carrying an HTTP `status`.
 
 | Status | Meaning |
 |---|---|
-| 400 | Validation failed (Zod) or invalid state transition |
+| 400 | Request body failed Zod validation |
 | 401 | Missing, invalid, or expired token |
 | 403 | Authenticated, but wrong role for this route |
 | 404 | Resource not found |
-| 409 | Conflict, e.g. no seats left or already joined |
+| 409 | Conflict: illegal status transition, or no seats left |
 | 500 | Unexpected server error |
-
-### Concurrency note
-
-`POST /pools/:id/join` reads and updates seat count inside a transaction using `SELECT ... FOR UPDATE`. If two passengers try to take the last seat at the same moment, one succeeds and the other gets `409`.
 
 ## Design decisions and trade-offs
 
-**Business logic lives in services, not controllers.** Matching, fare calculation, seat capacity, and state transitions sit in `services/` with no Express or HTTP dependency. That keeps them unit-testable in isolation, and controllers stay thin enough to read in seconds.
+**Business logic lives in services, not controllers.** Fare, matching, and state transitions sit in `services/` and `utils/` with no HTTP dependency, so they are unit-testable in isolation. Controllers stay thin.
 
-**Seat capacity is enforced in the database transaction, not in application code.** Checking "seats left" in JavaScript and then writing would race under concurrent requests. The join flow locks the pool row (`SELECT ... FOR UPDATE`) inside a transaction, so the check and the write are atomic. The trade-off is that requests for the same pool are serialized, which is fine at this scale.
+**Seat capacity is enforced inside a database transaction.** Checking "seats left" in JavaScript and then writing would race under concurrent requests. The join flow locks the pool row with `SELECT ... FOR UPDATE` (`pool.service.js`), then checks capacity and writes in the same transaction. Two passengers racing for the last seat cannot both win; there is an integration test for exactly this (`pool-concurrency.test.js`). The trade-off is that requests for the same pool are serialized, which is fine at this scale.
 
-**Fare is split evenly across passengers.** [Describe your actual rule, e.g. "total fare / passengers currently seated, recalculated when someone joins or leaves".] It's simple and easy to explain. It does not account for different pickup distances.
+**Fares are recalculated in the same transaction as the join.** Estimates for every active member update atomically with the seat change, so a passenger never sees a fare that disagrees with the pool's actual size.
 
-**Explicit state machine for pool status.** Statuses can only move along allowed transitions [list yours, e.g. OPEN → FULL → IN_PROGRESS → COMPLETED / CANCELLED]. Invalid transitions are rejected in the service layer with a `400`.
+**Money is integer poysha.** Exact arithmetic, with the discount rounded down explicitly (`Math.floor`).
 
-**Stateless JWT auth.** No session store to run, and the API scales horizontally without shared state. The trade-off is that tokens can't be revoked before they expire. Short expiry is the mitigation.
+**One state machine for ride status.** `utils/rideStateMachine.js` is the single source of truth: `REQUESTED → MATCHED → DRIVER_ARRIVED → STARTED → COMPLETED`, with `CANCELLED` reachable from any state before `STARTED`. `COMPLETED` and `CANCELLED` are terminal. Illegal transitions throw a `409`. The same table validates pool and member transitions.
+
+**Stateless JWT auth.** No session store to run. The trade-off is that tokens can't be revoked before they expire.
 
 **Validation before logic.** Zod schemas run as middleware, so services can assume well-formed input.
 
 ## Known limitations
 
-- **No real-time updates.** The UI polls or refreshes to see seat changes. WebSockets or server-sent events would fix this.
-- **No refresh tokens or token revocation.** A stolen JWT is valid until it expires.
-- **Areas are a fixed enum**, not real geolocation. Matching is by area name, not distance or route.
-- **No payment integration.** Fares are calculated and displayed, never charged.
-- **Limited test coverage.** [State honestly what is covered, e.g. "services and the join endpoint are tested; the frontend is not".]
-- **No rate limiting or account lockout** on auth endpoints.
-- **Single-instance deployment.** Docker Compose is for local and demo use, not production hosting.
+- **No real-time updates.** The UI must poll or refresh to see pool changes.
+- **Areas are a fixed enum**, not real geolocation. Distance comes from a lookup between area names.
+- **No payment integration.** Fares are calculated, never charged.
+- **No refresh tokens or revocation**, so a stolen JWT is valid until it expires.
+- **No rate limiting or security headers** (`helmet`) on the API.
+- **Integration tests need a live Postgres** with migrations applied. Service-layer coverage comes from those integration suites; the unit suites cover `utils/` only.
+- **Single-instance deployment.** Docker Compose is for local and demo use.
 
 ## With more time
 
-1. Real-time seat updates over WebSockets.
-2. Route-aware matching using coordinates instead of area labels.
+1. Real-time pool updates over WebSockets.
+2. Route-aware matching using coordinates.
 3. Refresh-token flow with revocation.
-4. Rate limiting and security headers (`helmet`).
-5. Frontend component tests and a browser end-to-end test of the join flow.
-6. CI pipeline running lint and tests on every push.
+4. Rate limiting and `helmet`.
+5. Frontend component tests and a browser end-to-end test.
+6. CI running lint and tests on every push.
 
 ## Author
 
