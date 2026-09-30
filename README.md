@@ -286,3 +286,40 @@ Errors share one shape, produced by the central error handler:
 ### Concurrency note
 
 `POST /pools/:id/join` reads and updates seat count inside a transaction using `SELECT ... FOR UPDATE`. If two passengers try to take the last seat at the same moment, one succeeds and the other gets `409`.
+
+## Design decisions and trade-offs
+
+**Business logic lives in services, not controllers.** Matching, fare calculation, seat capacity, and state transitions sit in `services/` with no Express or HTTP dependency. That keeps them unit-testable in isolation, and controllers stay thin enough to read in seconds.
+
+**Seat capacity is enforced in the database transaction, not in application code.** Checking "seats left" in JavaScript and then writing would race under concurrent requests. The join flow locks the pool row (`SELECT ... FOR UPDATE`) inside a transaction, so the check and the write are atomic. The trade-off is that requests for the same pool are serialized, which is fine at this scale.
+
+**Fare is split evenly across passengers.** [Describe your actual rule, e.g. "total fare / passengers currently seated, recalculated when someone joins or leaves".] It's simple and easy to explain. It does not account for different pickup distances.
+
+**Explicit state machine for pool status.** Statuses can only move along allowed transitions [list yours, e.g. OPEN → FULL → IN_PROGRESS → COMPLETED / CANCELLED]. Invalid transitions are rejected in the service layer with a `400`.
+
+**Stateless JWT auth.** No session store to run, and the API scales horizontally without shared state. The trade-off is that tokens can't be revoked before they expire. Short expiry is the mitigation.
+
+**Validation before logic.** Zod schemas run as middleware, so services can assume well-formed input.
+
+## Known limitations
+
+- **No real-time updates.** The UI polls or refreshes to see seat changes. WebSockets or server-sent events would fix this.
+- **No refresh tokens or token revocation.** A stolen JWT is valid until it expires.
+- **Areas are a fixed enum**, not real geolocation. Matching is by area name, not distance or route.
+- **No payment integration.** Fares are calculated and displayed, never charged.
+- **Limited test coverage.** [State honestly what is covered, e.g. "services and the join endpoint are tested; the frontend is not".]
+- **No rate limiting or account lockout** on auth endpoints.
+- **Single-instance deployment.** Docker Compose is for local and demo use, not production hosting.
+
+## With more time
+
+1. Real-time seat updates over WebSockets.
+2. Route-aware matching using coordinates instead of area labels.
+3. Refresh-token flow with revocation.
+4. Rate limiting and security headers (`helmet`).
+5. Frontend component tests and a browser end-to-end test of the join flow.
+6. CI pipeline running lint and tests on every push.
+
+## Author
+
+Built by Mashraful for the RoBenDevs internship challenge.
