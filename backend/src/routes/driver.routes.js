@@ -8,6 +8,9 @@ const router = express.Router();
 
 router.use(requireAuth, requireRole('DRIVER'));
 
+router.get('/vehicles', driverController.listVehicles);
+router.post('/vehicles', validate(require('../schemas/driver.schema').createVehicleSchema), driverController.createVehicle);
+
 router.get('/requests', driverController.listRequests);
 router.patch('/vehicles/:vehicleId/online', validate(setOnlineSchema), driverController.setOnline);
 router.post('/vehicles/:vehicleId/accept', validate(acceptRideSchema), driverController.accept);
